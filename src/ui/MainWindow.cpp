@@ -70,6 +70,7 @@ MainWindow::MainWindow(QWidget* parent)
         if (i == 3)
             tileStates_[i].mode = WfmDisplayMode::Video;
         tiles_[i]->setTileState(tileStates_[i]);
+        connect(tiles_[i], &WfmGlWidget::lineClicked, this, &MainWindow::onPictureLineClicked);
         grid->addWidget(tiles_[i], i / 2, i % 2);
     }
     left->addLayout(grid, 1);
@@ -155,6 +156,7 @@ void MainWindow::onTileCountChanged(int)
 {
     visibleTiles_ = tileCountCombo_->currentData().toInt();
     applyTileVisibility();
+    syncLineMarkers();
 }
 
 void MainWindow::onActiveTileChanged(int)
@@ -167,6 +169,49 @@ void MainWindow::onControlsChanged(const TileState& state)
 {
     tileStates_[activeTile_] = state;
     tiles_[activeTile_]->setTileState(state);
+    syncLineMarkers();
+}
+
+void MainWindow::onPictureLineClicked(int line)
+{
+    // Clicking the picture selects that line on the scope tiles.
+    // If no scope tile has Line Select on yet, turn it on for all of them.
+    bool anyEnabled = false;
+    for (int i = 0; i < visibleTiles_; ++i) {
+        const TileState& s = tileStates_[i];
+        if (s.mode != WfmDisplayMode::Video && s.mode != WfmDisplayMode::None && s.lineSelectEnabled)
+            anyEnabled = true;
+    }
+
+    for (int i = 0; i < visibleTiles_; ++i) {
+        TileState& s = tileStates_[i];
+        if (s.mode == WfmDisplayMode::Video || s.mode == WfmDisplayMode::None)
+            continue;
+        if (!anyEnabled)
+            s.lineSelectEnabled = true;
+        if (s.lineSelectEnabled) {
+            s.selectedLine = line;
+            tiles_[i]->setTileState(s);
+        }
+    }
+
+    controls_->setState(tileStates_[activeTile_]);
+    syncLineMarkers();
+}
+
+void MainWindow::syncLineMarkers()
+{
+    // Line picked on any visible scope tile is echoed as a marker on Video tiles.
+    int line = -1;
+    for (int i = 0; i < visibleTiles_; ++i) {
+        const TileState& s = tileStates_[i];
+        if (s.mode != WfmDisplayMode::Video && s.mode != WfmDisplayMode::None && s.lineSelectEnabled) {
+            line = s.selectedLine;
+            break;
+        }
+    }
+    for (int i = 0; i < 4; ++i)
+        tiles_[i]->setMarkerLine(line);
 }
 
 void MainWindow::onCaptureStatus()

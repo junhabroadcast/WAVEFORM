@@ -103,10 +103,22 @@ TileControls::TileControls(QWidget* parent)
 
 void TileControls::setState(const TileState& state)
 {
-    const QSignalBlocker b1(mode_);
-    mode_->setCurrentIndex(int(state.mode));
-    style_->setCurrentIndex(int(state.style));
-    sweep_->setCurrentIndex(int(state.sweep));
+    // Block every control: refreshing the panel must never write back into
+    // the tile state (that feedback loop corrupted style/sweep on click).
+    const QSignalBlocker b1(mode_), b2(style_), b3(sweep_), b4(gain_), b5(varEnable_),
+        b6(varGain_), b7(mag_), b8(lineSelect_), b9(line_), b10(freeze_), b11(bars75_),
+        b12(compY_), b13(compCb_), b14(compCr_), b15(persistence_), b16(intensity_);
+
+    // Combo item order differs from enum values — always match by data.
+    const int modeIdx = mode_->findData(int(state.mode));
+    if (modeIdx >= 0)
+        mode_->setCurrentIndex(modeIdx);
+    const int styleIdx = style_->findData(int(state.style));
+    if (styleIdx >= 0)
+        style_->setCurrentIndex(styleIdx);
+    const int sweepIdx = sweep_->findData(int(state.sweep));
+    if (sweepIdx >= 0)
+        sweep_->setCurrentIndex(sweepIdx);
     const int gi = gain_->findData(double(state.gain));
     if (gi >= 0)
         gain_->setCurrentIndex(gi);

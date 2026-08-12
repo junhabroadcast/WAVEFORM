@@ -31,10 +31,12 @@ private slots:
     void onColorBarsToggled(bool checked);
     void onCaptureStatus();
     void onPumpFrames();
+    void onPictureLineClicked(int line);
 
 private:
     void applyTileVisibility();
     void refreshDeviceList();
+    void syncLineMarkers();
 
     FrameQueue queue_;
     std::unique_ptr<DeckLinkCapture> capture_;

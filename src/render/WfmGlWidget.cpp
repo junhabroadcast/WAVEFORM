@@ -4,6 +4,7 @@
 
 #include <QFile>
 #include <QLabel>
+#include <QMouseEvent>
 #include <QPainter>
 #include <QResizeEvent>
 #include <algorithm>
@@ -83,6 +84,7 @@ void WfmGlWidget::setTileState(const TileState& state)
 {
     const bool modeChanged = state.mode != state_.mode;
     state_ = state;
+    setCursor(state_.mode == WfmDisplayMode::Video ? Qt::CrossCursor : Qt::ArrowCursor);
     if (modeChanged && glReady_ && accumFbo_) {
         makeCurrent();
         glBindFramebuffer(GL_FRAMEBUFFER, accumFbo_);
@@ -119,6 +121,15 @@ void WfmGlWidget::setStatus(const QString& modeName, bool locked, uint64_t drops
     updateReadoutLabel();
 }
 
+void WfmGlWidget::setMarkerLine(int line)
+{
+    if (markerLine_ == line)
+        return;
+    markerLine_ = line;
+    updateReadoutLabel();
+    update();
+}
+
 void WfmGlWidget::updateReadoutLabel()
 {
     if (!readout_)
@@ -133,6 +144,12 @@ void WfmGlWidget::updateReadoutLabel()
                        .arg(state_.mag, 0, 'f', 0)
                        .arg(modeName_.isEmpty() ? QStringLiteral("-") : modeName_)
                        .arg(drops_);
+    if (state_.mode == WfmDisplayMode::Video) {
+        if (state_.lineSelectEnabled)
+            line += QStringLiteral(" | LINE %1").arg(state_.selectedLine);
+        else if (markerLine_ >= 0)
+            line += QStringLiteral(" | LINE %1").arg(markerLine_);
+    }
     if (state_.freeze)
         line += QStringLiteral(" | FREEZE");
     if (!locked_)
@@ -153,6 +170,51 @@ void WfmGlWidget::resizeEvent(QResizeEvent* event)
 {
     QOpenGLWidget::resizeEvent(event);
     layoutReadoutLabel();
+}
+
+int WfmGlWidget::lineAtPosition(const QPointF& pos) const
+{
+    const VideoFramePtr frame = state_.freeze && frozenFrame_ ? frozenFrame_ : liveFrame_;
+    if (!frame || frame->empty() || width() <= 0 || height() <= 0)
+        return -1;
+
+    // Invert the letterbox/pillarbox mapping used by picture.frag.
+    const float frameAspect = float(frame->width) / float(std::max(frame->height, 1));
+    const float viewAspect = float(width()) / float(height());
+    float u = float(pos.x()) / float(width());
+    float v = float(pos.y()) / float(height()); // 0 at top, like the unpacked planes
+
+    if (viewAspect > frameAspect) {
+        const float w = frameAspect / viewAspect;
+        u = (u - 0.5f) / w + 0.5f;
+    } else {
+        const float h = viewAspect / frameAspect;
+        v = (v - 0.5f) / h + 0.5f;
+    }
+
+    if (u < 0.0f || u > 1.0f || v < 0.0f || v > 1.0f)
+        return -1;
+    return std::clamp(int(v * float(frame->height)), 0, frame->height - 1);
+}
+
+void WfmGlWidget::mousePressEvent(QMouseEvent* event)
+{
+    if (state_.mode == WfmDisplayMode::Video && event->button() == Qt::LeftButton) {
+        const int line = lineAtPosition(event->position());
+        if (line >= 0)
+            emit lineClicked(line);
+    }
+    QOpenGLWidget::mousePressEvent(event);
+}
+
+void WfmGlWidget::mouseMoveEvent(QMouseEvent* event)
+{
+    if (state_.mode == WfmDisplayMode::Video && (event->buttons() & Qt::LeftButton)) {
+        const int line = lineAtPosition(event->position());
+        if (line >= 0)
+            emit lineClicked(line);
+    }
+    QOpenGLWidget::mouseMoveEvent(event);
 }
 
 bool WfmGlWidget::loadShaderProgram(unsigned& program, const char* vertRes, const char* fragRes)
@@ -407,7 +469,35 @@ void WfmGlWidget::drawGraticuleOverlay(QPainter& painter)
     case WfmDisplayMode::Lightning:
         Graticule::drawLightning(painter, r, state_, c);
         break;
-    case WfmDisplayMode::Video:
+    case WfmDisplayMode::Video: {
+        // Marker line + line number drawn over the picture.
+        const int line = state_.lineSelectEnabled ? state_.selectedLine : markerLine_;
+        const VideoFramePtr frame = state_.freeze && frozenFrame_ ? frozenFrame_ : liveFrame_;
+        if (line >= 0 && frame && !frame->empty()) {
+            const float W = float(width());
+            const float H = float(height());
+            const float frameAspect = float(frame->width) / float(std::max(frame->height, 1));
+            const float viewAspect = W / H;
+
+            // Forward letterbox/pillarbox mapping (same as picture.frag).
+            float v = (float(line) + 0.5f) / float(frame->height);
+            float x0 = 0.0f;
+            float x1 = W;
+            if (viewAspect > frameAspect) {
+                const float w = frameAspect / viewAspect;
+                x0 = (0.5f - 0.5f * w) * W;
+                x1 = (0.5f + 0.5f * w) * W;
+            } else {
+                const float h = viewAspect / frameAspect;
+                v = (v - 0.5f) * h + 0.5f;
+            }
+            const float y = v * H;
+
+            painter.setPen(QPen(QColor(255, 216, 50, 230), 1.0));
+            painter.drawLine(QPointF(x0, y), QPointF(x1, y));
+        }
+        break;
+    }
     case WfmDisplayMode::None:
         break;
     }
@@ -444,8 +534,9 @@ void WfmGlWidget::renderPicture()
     glUniform2f(glGetUniformLocation(progPicture_, "uViewportSize"),
                 float(width() * devicePixelRatioF()), float(height() * devicePixelRatioF()));
     glUniform1i(glGetUniformLocation(progPicture_, "uColorimetry"), (c == Colorimetry::BT601) ? 0 : 1);
-    glUniform1i(glGetUniformLocation(progPicture_, "uLineSelect"),
-                state_.lineSelectEnabled ? state_.selectedLine : -1);
+    // Own line select takes priority; otherwise show the line picked on a scope tile.
+    const int highlightLine = state_.lineSelectEnabled ? state_.selectedLine : markerLine_;
+    glUniform1i(glGetUniformLocation(progPicture_, "uLineSelect"), highlightLine);
     glBindVertexArray(vaoEmpty_);
     glDrawArrays(GL_TRIANGLES, 0, 3);
 }

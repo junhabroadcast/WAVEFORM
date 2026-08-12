@@ -11,11 +11,20 @@ class QLabel;
 class QPainter;
 class QResizeEvent;
 
+class QMouseEvent;
+
 class WfmGlWidget : public QOpenGLWidget, protected QOpenGLFunctions_3_3_Core {
     Q_OBJECT
 public:
     explicit WfmGlWidget(QWidget* parent = nullptr);
     ~WfmGlWidget() override;
+
+signals:
+    // Emitted when the user clicks/drags on the picture (Video mode)
+    // to pick a video line. 0-based line index.
+    void lineClicked(int line);
+
+public:
 
     void setTileState(const TileState& state);
     TileState tileState() const { return state_; }
@@ -23,12 +32,16 @@ public:
     void setFrame(const VideoFramePtr& frame);
     void setStatus(const QString& modeName, bool locked, uint64_t drops);
     void setColorimetry(Colorimetry c) { colorimetry_ = c; }
+    // Line selected on another (scope) tile; shown as a marker on the picture.
+    void setMarkerLine(int line);
 
 protected:
     void initializeGL() override;
     void resizeGL(int w, int h) override;
     void paintGL() override;
     void resizeEvent(QResizeEvent* event) override;
+    void mousePressEvent(QMouseEvent* event) override;
+    void mouseMoveEvent(QMouseEvent* event) override;
 
 private:
     bool loadShaderProgram(unsigned& program, const char* vertRes, const char* fragRes);
@@ -41,6 +54,7 @@ private:
     void drawGraticuleOverlay(QPainter& painter);
     void updateReadoutLabel();
     void layoutReadoutLabel();
+    int lineAtPosition(const QPointF& pos) const;
 
     TileState state_;
     VideoFramePtr liveFrame_;
@@ -48,6 +62,7 @@ private:
     QString modeName_;
     bool locked_ = false;
     uint64_t drops_ = 0;
+    int markerLine_ = -1;
     Colorimetry colorimetry_ = Colorimetry::Auto;
 
     QLabel* readout_ = nullptr;
