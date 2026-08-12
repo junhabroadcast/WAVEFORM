@@ -1,62 +1,66 @@
-# Notes — WAVEFORM v1.0.0
+# 노트 — WAVEFORM v1.1.0
 
-## Scope
+## 범위
 
-v1.0.0 focuses on **picture-layer** analysis only:
+v1.x는 **화상(픽처) 레이어** 분석에 집중합니다.
 
-- Waveform, Vector, Lightning
+포함:
 
-Not included (by design for this release):
+- Waveform, Vector, Lightning, Video(Picture)
+- Color Bars(내장 시뮬레이터)
 
-- Eye pattern / jitter (needs specialized PHY hardware; not available from deserialized SDI alone)
+미포함 (의도적):
+
+- Eye / Jitter (전용 PHY 하드웨어 영역, 역직렬화된 SDI만으로는 불가)
 - Diamond / Arrowhead / Bowtie
-- Audio meters / surround
-- ANC / closed caption deep decode
-- Composite simulation mode
+- 오디오 미터 / 서라운드
+- ANC / 자막 상세 디코드
+- Composite 시뮬레이션
 
-## Architecture (short)
+## 구조 (요약)
 
 ```
-SDI → DeckLink callback → FrameQueue → v210/UYVY unpack → Y/Cb/Cr planes
-  → OpenGL textures → vertex-ID point shader (mode mapping)
-  → additive R32F accum (+ decay) → CRT tonemap → Qt graticule overlay
+SDI → DeckLink 콜백 → FrameQueue → v210/UYVY 언팩 → Y/Cb/Cr
+  → OpenGL 텍스처 → 모드별 셰이더
+  → (스코프) 가산 누적 + decay + 톤맵
+  → (Video) YCbCr→RGB 화면
+  → Qt 계수선 + QLabel 상태 문구
 ```
 
-Key modules:
-
-| Path | Role |
+| 경로 | 역할 |
 |------|------|
-| `src/capture/` | DeckLink COM capture + queue |
-| `src/video/` | v210 / UYVY unpack |
-| `src/render/` | OpenGL accumulate / tonemap widget |
-| `src/display/` | Modes + graticule drawing |
-| `src/ui/` | Main window + tile controls |
-| `third_party/decklink/` | `#import` of installed `DeckLinkAPI64.dll` |
+| `src/capture/` | DeckLink 캡처 + 큐 + Color Bars |
+| `src/video/` | v210 / UYVY 언팩 |
+| `src/render/` | OpenGL 위젯 |
+| `src/display/` | 모드 / 계수선 |
+| `src/ui/` | 메인 창 / 타일 컨트롤 |
+| `third_party/decklink/` | 설치된 `DeckLinkAPI64.dll` `#import` |
 
-## Build / runtime tips
+## 사용 팁
 
-1. Install **Desktop Video** so `C:\Program Files\Blackmagic Design\Desktop Video\DeckLinkAPI64.dll` exists. The Windows build imports that typelib; a separate SDK zip is not required for v1.0.0.
-2. Qt path in `tools/build.ps1` defaults to `C:\Qt\6.7.3\msvc2019_64`. Edit if your install differs.
-3. Run `windeployqt` (done by the build script) before moving the exe to another machine.
-4. First launch: select device → **Start**. Status should show `LOCKED …` with live SDI, or `SIMULATOR …` offline.
+1. Desktop Video가 설치되어 `C:\Program Files\Blackmagic Design\Desktop Video\DeckLinkAPI64.dll` 이 있어야 합니다. v1.x는 별도 SDK zip이 필수는 아닙니다.
+2. `tools/build.ps1`의 Qt 경로는 기본 `C:\Qt\6.7.3\msvc2019_64` 입니다. 환경에 맞게 수정하세요.
+3. 다른 PC로 exe만 옮길 때는 `windeployqt`로 배포된 DLL이 함께 있어야 합니다.
+4. **Start** 후 상태바에 `LOCKED …` 또는 `COLOR BARS (forced) …` / `SIMULATOR …` 가 보이면 정상입니다.
+5. 캡처카드 대신 컬러바만 보려면 상단 **Color Bars** 를 체크하세요.
 
-## Performance expectations
+## 성능
 
-- Target: 1080i/p class with full-sample accumulation (no intentional downsampling).
-- Heavy multi-tile + high persistence can increase GPU load; reduce tile count if needed.
-- Queue keeps only the newest frame to bound latency.
+- 목표: 1080i/p급, 전 샘플 누적(의도적 다운샘플 없음)
+- 타일 수·persistence가 높으면 GPU 부하 증가 → 필요 시 타일 수 축소
+- 큐는 최신 프레임만 유지해 지연을 제한
 
-## Colorimetry
+## 컬러메트리
 
-- Auto chooses BT.601 vs BT.709 from active height (≥720 → BT.709).
-- Vector / Lightning target positions are approximate studio-bar locations for visual QC, not a certified legalizer.
+- Auto: 높이 ≥720 → BT.709, 그 외 BT.601
+- Vector / Lightning 타깃은 시각 QC용 근사치이며, 공인 legalizer 대체품이 아닙니다.
 
-## Manuals in the workspace
+## 로컬 매뉴얼 PDF
 
-Tektronix PDF manuals used for design reference may live next to the project locally. They are **not** part of the GitHub release bundle (large binaries / third-party copyright).
+설계 참고용 Tektronix PDF가 워크스페이스에 있을 수 있으나, 용량·저작권상 GitHub 릴리스에는 포함하지 않습니다.
 
-## Known limitations
+## 알려진 제한
 
-- `#import` / MSVC is required on Windows for DeckLink COM.
-- Simulator bars are for UI/path validation, not for calibrating a production chain.
-- RGB parade / composite gamut views are deferred to a later version.
+- Windows에서 DeckLink COM은 MSVC `#import`가 필요합니다.
+- 내장 컬러바는 UI/경로 검증용이며, 송출망 교정 기준이 아닙니다.
+- RGB Parade / Composite gamut 뷰는 이후 버전으로 미룹니다.

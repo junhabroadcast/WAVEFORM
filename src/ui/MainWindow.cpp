@@ -2,6 +2,7 @@
 #include "render/WfmGlWidget.h"
 #include "ui/TileControls.h"
 
+#include <QCheckBox>
 #include <QComboBox>
 #include <QGridLayout>
 #include <QHBoxLayout>
@@ -14,7 +15,7 @@
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent)
 {
-    setWindowTitle(QStringLiteral("WFM Monitor — DeckLink Waveform / Vector / Lightning"));
+    setWindowTitle(QStringLiteral("WAVEFORM — DeckLink Waveform / Vector / Lightning / Video"));
     resize(1400, 900);
 
     capture_ = std::make_unique<DeckLinkCapture>(queue_);
@@ -37,6 +38,10 @@ MainWindow::MainWindow(QWidget* parent)
     topBar->addWidget(startBtn);
     topBar->addWidget(stopBtn);
 
+    colorBarsCheck_ = new QCheckBox(QStringLiteral("Color Bars"), this);
+    colorBarsCheck_->setToolTip(QStringLiteral("Force internal 75% color bars instead of DeckLink SDI"));
+    topBar->addWidget(colorBarsCheck_);
+
     tileCountCombo_ = new QComboBox(this);
     tileCountCombo_->addItem(QStringLiteral("1 Tile"), 1);
     tileCountCombo_->addItem(QStringLiteral("2 Tiles"), 2);
@@ -56,14 +61,14 @@ MainWindow::MainWindow(QWidget* parent)
     for (int i = 0; i < 4; ++i) {
         tiles_[i] = new WfmGlWidget(this);
         tileStates_[i] = TileState{};
+        if (i == 0)
+            tileStates_[i].mode = WfmDisplayMode::Waveform;
         if (i == 1)
             tileStates_[i].mode = WfmDisplayMode::Vector;
         if (i == 2)
             tileStates_[i].mode = WfmDisplayMode::Lightning;
-        if (i == 3) {
-            tileStates_[i].mode = WfmDisplayMode::Waveform;
-            tileStates_[i].style = WaveformStyle::Overlay;
-        }
+        if (i == 3)
+            tileStates_[i].mode = WfmDisplayMode::Video;
         tiles_[i]->setTileState(tileStates_[i]);
         grid->addWidget(tiles_[i], i / 2, i % 2);
     }
@@ -79,6 +84,7 @@ MainWindow::MainWindow(QWidget* parent)
 
     connect(startBtn, &QPushButton::clicked, this, &MainWindow::onStart);
     connect(stopBtn, &QPushButton::clicked, this, &MainWindow::onStop);
+    connect(colorBarsCheck_, &QCheckBox::toggled, this, &MainWindow::onColorBarsToggled);
     connect(deviceCombo_, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &MainWindow::onDeviceChanged);
     connect(tileCountCombo_, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &MainWindow::onTileCountChanged);
     connect(activeTileCombo_, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &MainWindow::onActiveTileChanged);
@@ -87,6 +93,10 @@ MainWindow::MainWindow(QWidget* parent)
     pumpTimer_ = new QTimer(this);
     connect(pumpTimer_, &QTimer::timeout, this, &MainWindow::onPumpFrames);
     pumpTimer_->start(16);
+
+    // Default to classic 4-tile QC layout
+    tileCountCombo_->setCurrentIndex(2); // 4 Tiles
+    visibleTiles_ = 4;
 
     refreshDeviceList();
     applyTileVisibility();
@@ -118,6 +128,7 @@ void MainWindow::onStart()
     if (idx < 0)
         idx = 0;
     capture_->setSimulatorFallback(true);
+    capture_->setForceColorBars(colorBarsCheck_->isChecked());
     capture_->start(idx);
     onCaptureStatus();
 }
@@ -125,6 +136,13 @@ void MainWindow::onStart()
 void MainWindow::onStop()
 {
     capture_->stop();
+    onCaptureStatus();
+}
+
+void MainWindow::onColorBarsToggled(bool checked)
+{
+    capture_->setForceColorBars(checked);
+    deviceCombo_->setEnabled(!checked);
     onCaptureStatus();
 }
 

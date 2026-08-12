@@ -5,5 +5,6 @@
         <file>shaders/tonemap.vert</file>
         <file>shaders/tonemap.frag</file>
         <file>shaders/decay.frag</file>
+        <file>shaders/picture.frag</file>
     </qresource>
 </RCC>

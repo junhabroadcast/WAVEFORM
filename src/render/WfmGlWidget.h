@@ -7,6 +7,10 @@
 #include <QOpenGLWidget>
 #include <QString>
 
+class QLabel;
+class QPainter;
+class QResizeEvent;
+
 class WfmGlWidget : public QOpenGLWidget, protected QOpenGLFunctions_3_3_Core {
     Q_OBJECT
 public:
@@ -24,16 +28,19 @@ protected:
     void initializeGL() override;
     void resizeGL(int w, int h) override;
     void paintGL() override;
-    void paintEvent(QPaintEvent* event) override;
+    void resizeEvent(QResizeEvent* event) override;
 
 private:
     bool loadShaderProgram(unsigned& program, const char* vertRes, const char* fragRes);
     void ensureAccumSize();
     void uploadPlanes(const VideoFrame& frame);
     void renderTrace();
+    void renderPicture();
     void decayAccum();
     void tonemapToScreen();
-    void drawGraticuleOverlay();
+    void drawGraticuleOverlay(QPainter& painter);
+    void updateReadoutLabel();
+    void layoutReadoutLabel();
 
     TileState state_;
     VideoFramePtr liveFrame_;
@@ -43,9 +50,12 @@ private:
     uint64_t drops_ = 0;
     Colorimetry colorimetry_ = Colorimetry::Auto;
 
+    QLabel* readout_ = nullptr;
+
     GLuint progPoints_ = 0;
     GLuint progTonemap_ = 0;
     GLuint progDecay_ = 0;
+    GLuint progPicture_ = 0;
     GLuint vaoEmpty_ = 0;
 
     GLuint texY_ = 0;

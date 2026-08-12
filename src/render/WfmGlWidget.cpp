@@ -3,8 +3,9 @@
 #include "display/Graticule.h"
 
 #include <QFile>
-#include <QPaintEvent>
+#include <QLabel>
 #include <QPainter>
+#include <QResizeEvent>
 #include <algorithm>
 #include <cmath>
 #include <vector>
@@ -41,6 +42,21 @@ WfmGlWidget::WfmGlWidget(QWidget* parent)
     fmt.setVersion(3, 3);
     fmt.setProfile(QSurfaceFormat::CoreProfile);
     setFormat(fmt);
+
+    // Status text as a real widget — avoids QPainter-on-GL glyph ghosting.
+    readout_ = new QLabel(this);
+    readout_->setAttribute(Qt::WA_TransparentForMouseEvents);
+    readout_->setStyleSheet(QStringLiteral(
+        "QLabel {"
+        "  background-color: rgba(0, 0, 0, 210);"
+        "  color: rgb(180, 255, 180);"
+        "  font-family: Consolas, 'Courier New', monospace;"
+        "  font-size: 12px;"
+        "  padding-left: 8px;"
+        "  padding-right: 8px;"
+        "}"));
+    readout_->setAlignment(Qt::AlignVCenter | Qt::AlignLeft);
+    updateReadoutLabel();
 }
 
 WfmGlWidget::~WfmGlWidget()
@@ -50,6 +66,7 @@ WfmGlWidget::~WfmGlWidget()
         glDeleteProgram(progPoints_);
         glDeleteProgram(progTonemap_);
         glDeleteProgram(progDecay_);
+        glDeleteProgram(progPicture_);
         glDeleteVertexArrays(1, &vaoEmpty_);
         glDeleteTextures(1, &texY_);
         glDeleteTextures(1, &texCb_);
@@ -65,6 +82,7 @@ WfmGlWidget::~WfmGlWidget()
 void WfmGlWidget::setTileState(const TileState& state)
 {
     state_ = state;
+    updateReadoutLabel();
     update();
 }
 
@@ -84,9 +102,48 @@ void WfmGlWidget::setFrame(const VideoFramePtr& frame)
 
 void WfmGlWidget::setStatus(const QString& modeName, bool locked, uint64_t drops)
 {
+    if (modeName_ == modeName && locked_ == locked && drops_ == drops)
+        return;
     modeName_ = modeName;
     locked_ = locked;
     drops_ = drops;
+    updateReadoutLabel();
+}
+
+void WfmGlWidget::updateReadoutLabel()
+{
+    if (!readout_)
+        return;
+
+    const QString gain = state_.varGainEnabled
+        ? QStringLiteral("VAR %1x").arg(state_.varGain, 0, 'f', 2)
+        : QStringLiteral("%1x").arg(state_.gain, 0, 'f', 0);
+    QString line = QStringLiteral("%1 | Gain %2 | Mag %3x | %4 | drops %5")
+                       .arg(displayModeName(state_.mode))
+                       .arg(gain)
+                       .arg(state_.mag, 0, 'f', 0)
+                       .arg(modeName_.isEmpty() ? QStringLiteral("-") : modeName_)
+                       .arg(drops_);
+    if (state_.freeze)
+        line += QStringLiteral(" | FREEZE");
+    if (!locked_)
+        line += QStringLiteral(" | NO LOCK");
+    readout_->setText(line);
+}
+
+void WfmGlWidget::layoutReadoutLabel()
+{
+    if (!readout_)
+        return;
+    constexpr int kH = 22;
+    readout_->setGeometry(0, height() - kH, width(), kH);
+    readout_->raise();
+}
+
+void WfmGlWidget::resizeEvent(QResizeEvent* event)
+{
+    QOpenGLWidget::resizeEvent(event);
+    layoutReadoutLabel();
 }
 
 bool WfmGlWidget::loadShaderProgram(unsigned& program, const char* vertRes, const char* fragRes)
@@ -116,6 +173,7 @@ void WfmGlWidget::initializeGL()
     loadShaderProgram(progPoints_, ":/shaders/shaders/points.vert", ":/shaders/shaders/points.frag");
     loadShaderProgram(progTonemap_, ":/shaders/shaders/tonemap.vert", ":/shaders/shaders/tonemap.frag");
     loadShaderProgram(progDecay_, ":/shaders/shaders/tonemap.vert", ":/shaders/shaders/decay.frag");
+    loadShaderProgram(progPicture_, ":/shaders/shaders/tonemap.vert", ":/shaders/shaders/picture.frag");
 
     glGenVertexArrays(1, &vaoEmpty_);
 
@@ -261,7 +319,7 @@ void WfmGlWidget::renderTrace()
         drawPass(2);
     } else if (state_.mode == WfmDisplayMode::Vector) {
         drawPass(0);
-    } else {
+    } else if (state_.mode == WfmDisplayMode::Lightning) {
         drawPass(0); // Pb-Y
         drawPass(1); // Pr-Y
     }
@@ -284,11 +342,11 @@ void WfmGlWidget::tonemapToScreen()
     glDrawArrays(GL_TRIANGLES, 0, 3);
 }
 
-void WfmGlWidget::drawGraticuleOverlay()
+void WfmGlWidget::drawGraticuleOverlay(QPainter& painter)
 {
-    QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing, true);
-    const QRectF r = rect();
+    // Leave bottom strip for the QLabel readout.
+    const QRectF r = rect().adjusted(0, 0, 0, -22);
     const Colorimetry c = ColorMatrix::resolve(colorimetry_, liveFrame_ ? liveFrame_->height : 1080);
 
     switch (state_.mode) {
@@ -301,21 +359,61 @@ void WfmGlWidget::drawGraticuleOverlay()
     case WfmDisplayMode::Lightning:
         Graticule::drawLightning(painter, r, state_);
         break;
+    case WfmDisplayMode::Video:
+        break;
     }
-    Graticule::drawReadouts(painter, r, state_, modeName_, locked_, drops_);
+}
+
+void WfmGlWidget::renderPicture()
+{
+    const VideoFramePtr frame = state_.freeze && frozenFrame_ ? frozenFrame_ : liveFrame_;
+    glBindFramebuffer(GL_FRAMEBUFFER, defaultFramebufferObject());
+    glViewport(0, 0, int(std::lround(width() * devicePixelRatioF())),
+               int(std::lround(height() * devicePixelRatioF())));
+    glDisable(GL_BLEND);
+    glClearColor(0.02f, 0.02f, 0.02f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT);
+
+    if (!frame || frame->empty())
+        return;
+
+    uploadPlanes(*frame);
+
+    const Colorimetry c = ColorMatrix::resolve(colorimetry_, frame->height);
+
+    glUseProgram(progPicture_);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, texY_);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, texCb_);
+    glActiveTexture(GL_TEXTURE2);
+    glBindTexture(GL_TEXTURE_2D, texCr_);
+    glUniform1i(glGetUniformLocation(progPicture_, "uY"), 0);
+    glUniform1i(glGetUniformLocation(progPicture_, "uCb"), 1);
+    glUniform1i(glGetUniformLocation(progPicture_, "uCr"), 2);
+    glUniform2f(glGetUniformLocation(progPicture_, "uFrameSize"), float(frame->width), float(frame->height));
+    glUniform2f(glGetUniformLocation(progPicture_, "uViewportSize"),
+                float(width() * devicePixelRatioF()), float(height() * devicePixelRatioF()));
+    glUniform1i(glGetUniformLocation(progPicture_, "uColorimetry"), (c == Colorimetry::BT601) ? 0 : 1);
+    glUniform1i(glGetUniformLocation(progPicture_, "uLineSelect"),
+                state_.lineSelectEnabled ? state_.selectedLine : -1);
+    glBindVertexArray(vaoEmpty_);
+    glDrawArrays(GL_TRIANGLES, 0, 3);
 }
 
 void WfmGlWidget::paintGL()
 {
-    ensureAccumSize();
-    decayAccum();
-    renderTrace();
-    tonemapToScreen();
-}
+    if (state_.mode == WfmDisplayMode::Video) {
+        renderPicture();
+    } else {
+        ensureAccumSize();
+        decayAccum();
+        renderTrace();
+        tonemapToScreen();
+    }
 
-void WfmGlWidget::paintEvent(QPaintEvent* event)
-{
-    // Custom: run GL then overlay. QOpenGLWidget::paintEvent calls paintGL.
-    QOpenGLWidget::paintEvent(event);
-    drawGraticuleOverlay();
+    // Must paint overlays inside paintGL. Drawing in paintEvent leaves stale
+    // text pixels (drops counter changes every frame → smeared glyphs).
+    QPainter painter(this);
+    drawGraticuleOverlay(painter);
 }

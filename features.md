@@ -1,55 +1,63 @@
-# Features — WAVEFORM v1.0.0
+# 기능 — WAVEFORM v1.1.0
 
-## Capture
+## 캡처
 
-- Blackmagic **DeckLink** SDI input via Desktop Video COM API
-- Device enumeration and selection
-- Prefer **10-bit YUV (v210)**; fallback to **8-bit UYVY**
-- Format detection / reconfigure on input change
-- Lock / no-signal status and frame counters
-- Latest-frame queue (low latency; drops stale frames)
-- **Simulator fallback**: 1080p ≈59.94 75% color bars when DeckLink is unavailable
+- Blackmagic **DeckLink** SDI 입력 (Desktop Video COM API)
+- 장치 목록 / 선택
+- **10-bit YUV (v210)** 우선, 실패 시 **8-bit UYVY**
+- 입력 포맷 자동 감지 및 재설정
+- 록 / 무신호 상태, 프레임 카운터
+- 최신 프레임만 유지하는 저지연 큐
+- **Color Bars 토글** — DeckLink가 있어도 강제 75% 컬러바
+- 장치/신호 없을 때 시뮬레이터 자동 폴백
 
-## Displays
+## 디스플레이
 
 ### Waveform
-- Voltage-vs-time plot of Y / Cb / Cr
-- **Parade** and **Overlay** styles
-- **Line** and **Field** sweep
-- Component enable/disable (Y, Cb, Cr)
-- Graticule with 0 / 50 / 100% style marks
+- Y / Cb / Cr 전압–시간 플롯
+- **Parade** / **Overlay**
+- **Line** / **Field** 스윕
+- 성분 on/off (Y, Cb, Cr)
+- 0 / 50 / 100% 스타일 계수선
 
 ### Vector
-- Cb (X) vs Cr (Y) plot
-- **75%** / **100%** color-bar target boxes
-- Compass / I–Q style axes overlay
+- Cb(X) vs Cr(Y)
+- **75%** / **100%** 컬러바 타깃 박스
+- 컴퍼스 / I–Q 축 오버레이
 
 ### Lightning
-- Upper half: **Pb vs Y**
-- Lower half: **Pr vs Y**
-- Target marks for gain / chroma–luma delay checks (color-bar oriented)
+- 상단: **Pb vs Y**
+- 하단: **Pr vs Y**
+- 게인·크로마–루마 지연 확인용 타깃 마크
 
-## Rendering
+### Video (Picture)
+- 동일 SDI/시뮬레이터 프레임의 실시간 화면
+- BT.601 / BT.709 YCbCr→RGB (높이 기준 Auto)
+- 화면비 유지 레터박스 / 필러박스
+- Line Select 시 해당 라인 하이라이트
+- Freeze는 스코프와 동일하게 적용
 
-- OpenGL 3.3 core profile
-- Per-sample GPU point mapping from planar YCbCr textures
-- Additive accumulation into **R32F** buffer
-- Persistence (decay) control
-- Intensity / CRT green tonemap
+## 렌더링
 
-## UI / controls
+- OpenGL 3.3 Core
+- Y/Cb/Cr 텍스처 → 모드별 포인트 매핑
+- R32F 가산 누적 + decay(persistence)
+- Intensity / CRT 녹색 톤맵
+- 타일 상태 문구는 QLabel로 표시 (잔상 방지)
 
-- 1 / 2 / 4 tile layouts
-- Per-tile mode assignment (Waveform / Vector / Lightning)
-- Gain: 1x / 2x / 5x / variable
-- Horizontal Mag: 1x / 5x / 10x / 20x
-- Line Select
-- Freeze
-- Persistence and intensity sliders
-- Status bar: lock state, mode name, push/drop/capture counters
+## UI / 컨트롤
 
-## Tooling
+- 1 / 2 / 4 타일
+- 타일별 Mode: Waveform / Vector / Lightning / Video
+- Gain: 1x / 2x / 5x / Var
+- Mag: 1x / 5x / 10x / 20x
+- Line Select, Freeze
+- Persistence / Intensity 슬라이더
+- Color Bars 체크 시 Device 콤보 비활성화
+- 상태바: 록/시뮬레이터/컬러바, push·drop·capture 카운터
 
-- CMake + Ninja + MSVC build
-- `tools/build.ps1` helper
-- `tools/validate_offline.py` for v210 round-trip and vector/lightning sanity checks
+## 도구
+
+- CMake + Ninja + MSVC
+- `tools/build.ps1`
+- `tools/validate_offline.py` (v210 라운드트립, 벡터/라이트닝 검증)

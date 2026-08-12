@@ -18,6 +18,7 @@ TileControls::TileControls(QWidget* parent)
     mode_->addItem(QStringLiteral("Waveform"), int(WfmDisplayMode::Waveform));
     mode_->addItem(QStringLiteral("Vector"), int(WfmDisplayMode::Vector));
     mode_->addItem(QStringLiteral("Lightning"), int(WfmDisplayMode::Lightning));
+    mode_->addItem(QStringLiteral("Video"), int(WfmDisplayMode::Video));
     layout->addRow(QStringLiteral("Mode"), mode_);
 
     style_ = new QComboBox(this);

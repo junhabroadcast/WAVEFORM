@@ -205,9 +205,34 @@ QStringList DeckLinkCapture::listDevices()
     return names;
 }
 
+void DeckLinkCapture::setForceColorBars(bool enabled)
+{
+    if (forceColorBars_ == enabled)
+        return;
+    forceColorBars_ = enabled;
+
+    if (!running_) {
+        emit statusChanged();
+        return;
+    }
+
+    // Hot-switch between DeckLink and color-bar simulator while running.
+    const int deviceIndex = lastDeviceIndex_;
+    stop();
+    start(deviceIndex);
+}
+
 bool DeckLinkCapture::start(int deviceIndex)
 {
     stop();
+    lastDeviceIndex_ = deviceIndex;
+
+    if (forceColorBars_) {
+        startSimulator();
+        running_ = true;
+        emit statusChanged();
+        return true;
+    }
 
     if (!openDevice(deviceIndex)) {
         if (simulatorFallback_) {
@@ -379,8 +404,11 @@ void DeckLinkCapture::handleFrame(const uint8_t* bytes, int rowBytes, int width,
 
 QString DeckLinkCapture::statusText() const
 {
-    if (simulatorActive_)
-        return QStringLiteral("SIMULATOR (no DeckLink input) — 75%% color bars");
+    if (simulatorActive_) {
+        if (forceColorBars_)
+            return QStringLiteral("COLOR BARS (forced) — 75% SMPTE bars");
+        return QStringLiteral("SIMULATOR (no DeckLink input) — 75% color bars");
+    }
     if (!running_)
         return QStringLiteral("Stopped");
     if (!signalLocked_)

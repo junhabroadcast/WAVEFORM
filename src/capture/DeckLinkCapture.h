@@ -27,6 +27,7 @@ public:
     bool start(int deviceIndex = 0);
     void stop();
     bool isRunning() const { return running_.load(); }
+    int lastDeviceIndex() const { return lastDeviceIndex_; }
 
     QString statusText() const;
     QString modeName() const;
@@ -37,6 +38,10 @@ public:
     // When true and no DeckLink device, synthesize 75% color bars for offline validation.
     void setSimulatorFallback(bool enabled) { simulatorFallback_ = enabled; }
     bool simulatorActive() const { return simulatorActive_.load(); }
+
+    // Force internal 75% color bars even when a DeckLink device is available.
+    void setForceColorBars(bool enabled);
+    bool forceColorBars() const { return forceColorBars_; }
 
 signals:
     void statusChanged();
@@ -76,6 +81,8 @@ private:
     double fps_ = 0.0;
     bool interlaced_ = false;
     bool simulatorFallback_ = true;
+    bool forceColorBars_ = false;
+    int lastDeviceIndex_ = 0;
 
     class QTimer* simulatorTimer_ = nullptr;
 };

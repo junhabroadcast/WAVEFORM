@@ -12,6 +12,7 @@ class WfmGlWidget;
 class TileControls;
 class QLabel;
 class QComboBox;
+class QCheckBox;
 class QTimer;
 
 class MainWindow : public QMainWindow {
@@ -27,6 +28,7 @@ private slots:
     void onTileCountChanged(int index);
     void onActiveTileChanged(int index);
     void onControlsChanged(const TileState& state);
+    void onColorBarsToggled(bool checked);
     void onCaptureStatus();
     void onPumpFrames();
 
@@ -40,6 +42,7 @@ private:
     QComboBox* deviceCombo_ = nullptr;
     QComboBox* tileCountCombo_ = nullptr;
     QComboBox* activeTileCombo_ = nullptr;
+    QCheckBox* colorBarsCheck_ = nullptr;
     QLabel* statusLabel_ = nullptr;
     TileControls* controls_ = nullptr;
     std::array<WfmGlWidget*, 4> tiles_{};

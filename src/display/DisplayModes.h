@@ -6,6 +6,7 @@ enum class WfmDisplayMode {
     Waveform,
     Vector,
     Lightning,
+    Video,
 };
 
 enum class WaveformStyle {
@@ -67,6 +68,8 @@ inline QString displayModeName(WfmDisplayMode m)
         return QStringLiteral("VECTOR");
     case WfmDisplayMode::Lightning:
         return QStringLiteral("LIGHTNING");
+    case WfmDisplayMode::Video:
+        return QStringLiteral("VIDEO");
     }
     return {};
 }

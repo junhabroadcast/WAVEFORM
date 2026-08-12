@@ -125,7 +125,6 @@ void drawReadouts(QPainter& p, const QRectF& r, const TileState& state, const QS
                   bool locked, uint64_t drops)
 {
     p.save();
-    p.setPen(QColor(180, 255, 180));
     QFont f = p.font();
     f.setFamily(QStringLiteral("Consolas"));
     f.setPixelSize(12);
@@ -142,7 +141,12 @@ void drawReadouts(QPainter& p, const QRectF& r, const TileState& state, const QS
                              .arg(drops)
                              .arg(state.freeze ? QStringLiteral(" | FREEZE") : QString())
                              .arg(locked ? QString() : QStringLiteral(" | NO LOCK"));
-    p.drawText(r.adjusted(8, 0, -8, -6), Qt::AlignBottom | Qt::AlignLeft, line);
+
+    // Opaque strip so changing counters never leave glyph ghosts.
+    const QRectF band(r.left(), r.bottom() - 22, r.width(), 22);
+    p.fillRect(band, QColor(0, 0, 0, 200));
+    p.setPen(QColor(180, 255, 180));
+    p.drawText(band.adjusted(8, 0, -8, -2), Qt::AlignVCenter | Qt::AlignLeft, line);
     p.restore();
 }
 
