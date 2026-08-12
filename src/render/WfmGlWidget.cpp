@@ -305,11 +305,50 @@ void WfmGlWidget::renderTrace()
     glUniform1f(glGetUniformLocation(progPoints_, "uAdd"), 0.08f);
     glUniform1f(glGetUniformLocation(progPoints_, "uPointSize"), 1.0f);
 
+    // Trace must land exactly where the QPainter graticule draws its targets.
+    // Mirror the geometry of drawGraticuleOverlay: full rect minus the 22 px
+    // readout strip, converted to NDC over the whole widget.
+    {
+        const float W = float(width());
+        const float H = float(height());
+        const QRectF r = QRectF(0, 0, width(), height()).adjusted(0, 0, 0, -22);
+        const QPointF c = r.center();
+        const float cxNdc = float(c.x()) * 2.0f / W - 1.0f;
+        const float cyNdc = 1.0f - float(c.y()) * 2.0f / H;
+        float sx = 1.0f;
+        float sy = 1.0f;
+        if (state_.mode == WfmDisplayMode::Vector) {
+            // Graticule: pixel offset = q * 2 * radius (q in -0.5..0.5).
+            const float radius = float(qMin(r.width(), r.height()) * 0.42);
+            sx = 4.0f * radius / W;
+            sy = 4.0f * radius / H;
+        } else if (state_.mode == WfmDisplayMode::Lightning) {
+            // Graticule: x offset = q * 2 * halfW, y offset = Y * halfH.
+            const float halfW = float(r.width() * 0.45);
+            const float halfH = float(r.height() * 0.5);
+            sx = 4.0f * halfW / W;
+            sy = 2.0f * halfH / H;
+        }
+        glUniform2f(glGetUniformLocation(progPoints_, "uTraceCenter"), cxNdc, cyNdc);
+        glUniform2f(glGetUniformLocation(progPoints_, "uTraceScale"), sx, sy);
+    }
+
     const GLsizei count = state_.lineSelectEnabled ? frame->width : frame->width * frame->height;
     glBindVertexArray(vaoEmpty_);
 
+    const GLint locLineMode = glGetUniformLocation(progPoints_, "uLineMode");
+    const bool connectSamples = state_.mode != WfmDisplayMode::Waveform;
+
     auto drawPass = [&](int pass) {
         glUniform1i(glGetUniformLocation(progPoints_, "uComponentPass"), pass);
+        if (connectSamples && count > 1) {
+            // Connected segments between consecutive samples give the
+            // continuous CRT-style trace (essential for sparse signals
+            // like color bars on the vectorscope).
+            glUniform1i(locLineMode, 1);
+            glDrawArrays(GL_LINES, 0, (count - 1) * 2);
+        }
+        glUniform1i(locLineMode, 0);
         glDrawArrays(GL_POINTS, 0, count);
     };
 
@@ -357,7 +396,7 @@ void WfmGlWidget::drawGraticuleOverlay(QPainter& painter)
         Graticule::drawVector(painter, r, state_, c);
         break;
     case WfmDisplayMode::Lightning:
-        Graticule::drawLightning(painter, r, state_);
+        Graticule::drawLightning(painter, r, state_, c);
         break;
     case WfmDisplayMode::Video:
         break;

@@ -10,7 +10,7 @@ namespace Graticule {
 
 void drawWaveform(QPainter& p, const QRectF& r, const TileState& state);
 void drawVector(QPainter& p, const QRectF& r, const TileState& state, Colorimetry colorimetry);
-void drawLightning(QPainter& p, const QRectF& r, const TileState& state);
+void drawLightning(QPainter& p, const QRectF& r, const TileState& state, Colorimetry colorimetry);
 
 void drawReadouts(QPainter& p, const QRectF& r, const TileState& state, const QString& modeName,
                   bool locked, uint64_t drops);

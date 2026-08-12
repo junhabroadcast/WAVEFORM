@@ -27,14 +27,15 @@ struct VectorTarget {
     QPointF pos; // Cb,Cr in -0.5..0.5
 };
 
-// 75% and 100% color bar targets in Cb/Cr space (BT.709 approx).
+// Color bar targets in Cb/Cr space, computed exactly from the matrix.
 QVector<VectorTarget> vectorTargets(bool bars75, Colorimetry c);
 
 struct LightningTarget {
-    QPointF upper; // Pb vs Y (top half)
-    QPointF lower; // Pr vs Y (bottom half)
+    QString name;
+    QPointF upper; // Pb (-0.5..0.5) vs Y (0..1), top half
+    QPointF lower; // Pr (-0.5..0.5) vs Y (0..1), bottom half
 };
 
-QVector<LightningTarget> lightningTargets(bool bars75);
+QVector<LightningTarget> lightningTargets(bool bars75, Colorimetry c);
 
 } // namespace ColorMatrix

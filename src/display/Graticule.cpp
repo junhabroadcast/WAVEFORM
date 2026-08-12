@@ -61,12 +61,20 @@ void drawVector(QPainter& p, const QRectF& r, const TileState& state, Colorimetr
     p.drawLine(QPointF(c.x() - radius, c.y()), QPointF(c.x() + radius, c.y()));
     p.drawLine(QPointF(c.x(), c.y() - radius), QPointF(c.x(), c.y() + radius));
 
-    // I/Q-ish axes at 33 degrees
-    const qreal ang = qDegreesToRadians(33.0);
-    p.drawLine(c + QPointF(qCos(ang) * radius, -qSin(ang) * radius),
-               c - QPointF(qCos(ang) * radius, -qSin(ang) * radius));
-    p.drawLine(c + QPointF(qCos(ang + M_PI_2) * radius, -qSin(ang + M_PI_2) * radius),
-               c - QPointF(qCos(ang + M_PI_2) * radius, -qSin(ang + M_PI_2) * radius));
+    // I/Q axes are an NTSC composite (subcarrier phase) concept: Q at 33°,
+    // +I at 303°. They are meaningless for HD component signals, so like
+    // real HD scopes we only draw them for BT.601 (SD) sources.
+    if (colorimetry == Colorimetry::BT601) {
+        const qreal ang = qDegreesToRadians(33.0);
+        const QPointF qDir(qCos(ang), -qSin(ang));            // 33° (up-right)
+        const QPointF iDir(qSin(ang), qCos(ang));             // 303° (down-right)
+        p.drawLine(c + qDir * radius, c - qDir * radius);
+        p.drawLine(c + iDir * radius, c - iDir * radius);
+        p.setPen(QColor(140, 220, 140));
+        p.drawText(c + qDir * radius * 0.92 + QPointF(4, -4), QStringLiteral("Q"));
+        p.drawText(c + iDir * radius * 0.92 + QPointF(4, 12), QStringLiteral("I"));
+        p.setPen(thinPen(QColor(60, 140, 60, 180)));
+    }
 
     const auto targets = ColorMatrix::vectorTargets(state.bars75, colorimetry);
     p.setPen(QColor(220, 220, 80));
@@ -84,7 +92,7 @@ void drawVector(QPainter& p, const QRectF& r, const TileState& state, Colorimetr
     p.restore();
 }
 
-void drawLightning(QPainter& p, const QRectF& r, const TileState& state)
+void drawLightning(QPainter& p, const QRectF& r, const TileState& state, Colorimetry colorimetry)
 {
     p.save();
     p.setRenderHint(QPainter::Antialiasing, true);
@@ -102,8 +110,9 @@ void drawLightning(QPainter& p, const QRectF& r, const TileState& state)
         p.drawLine(QPointF(r.center().x() - 4, yl), QPointF(r.center().x() + 4, yl));
     }
 
-    const auto targets = ColorMatrix::lightningTargets(state.bars75);
+    const auto targets = ColorMatrix::lightningTargets(state.bars75, colorimetry);
     p.setPen(QColor(220, 220, 80));
+    p.setBrush(Qt::NoBrush);
     const qreal halfH = (midY - r.top());
     const qreal halfW = r.width() * 0.45;
     for (const auto& t : targets) {
@@ -111,8 +120,10 @@ void drawLightning(QPainter& p, const QRectF& r, const TileState& state)
                          midY - t.upper.y() * halfH);
         const QPointF lo(r.center().x() + t.lower.x() * 2.0 * halfW,
                          midY + (1.0 - t.lower.y()) * halfH);
-        p.drawRect(QRectF(up.x() - 3, up.y() - 3, 6, 6));
-        p.drawRect(QRectF(lo.x() - 3, lo.y() - 3, 6, 6));
+        p.drawRect(QRectF(up.x() - 4, up.y() - 4, 8, 8));
+        p.drawRect(QRectF(lo.x() - 4, lo.y() - 4, 8, 8));
+        p.drawText(up + QPointF(6, -2), t.name);
+        p.drawText(lo + QPointF(6, -2), t.name);
     }
 
     p.setPen(QColor(160, 220, 160));

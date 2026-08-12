@@ -227,6 +227,14 @@ bool DeckLinkCapture::start(int deviceIndex)
     stop();
     lastDeviceIndex_ = deviceIndex;
 
+    // Reset detected format so stale info (e.g. "SIM ..." from a previous
+    // simulator run) never leaks into the readout of a new capture session.
+    modeName_.clear();
+    width_ = 0;
+    height_ = 0;
+    fps_ = 0.0;
+    interlaced_ = false;
+
     if (forceColorBars_) {
         startSimulator();
         running_ = true;
