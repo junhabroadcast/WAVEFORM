@@ -7,6 +7,7 @@ enum class WfmDisplayMode {
     Vector,
     Lightning,
     Video,
+    None,
 };
 
 enum class WaveformStyle {
@@ -53,7 +54,7 @@ struct TileState {
     int selectedLine = 0; // 0-based
     bool freeze = false;
     bool bars75 = true;
-    float persistence = 0.92f; // decay factor per frame
+    float persistence = 0.0f; // decay factor per frame (0 = no trail)
     float intensity = 0.35f;
 
     float effectiveGain() const { return varGainEnabled ? varGain : gain; }
@@ -70,6 +71,8 @@ inline QString displayModeName(WfmDisplayMode m)
         return QStringLiteral("LIGHTNING");
     case WfmDisplayMode::Video:
         return QStringLiteral("VIDEO");
+    case WfmDisplayMode::None:
+        return QStringLiteral("NONE");
     }
     return {};
 }

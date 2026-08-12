@@ -61,13 +61,12 @@ void drawVector(QPainter& p, const QRectF& r, const TileState& state, Colorimetr
     p.drawLine(QPointF(c.x() - radius, c.y()), QPointF(c.x() + radius, c.y()));
     p.drawLine(QPointF(c.x(), c.y() - radius), QPointF(c.x(), c.y() + radius));
 
-    // I/Q axes are an NTSC composite (subcarrier phase) concept: Q at 33°,
-    // +I at 303°. They are meaningless for HD component signals, so like
-    // real HD scopes we only draw them for BT.601 (SD) sources.
-    if (colorimetry == Colorimetry::BT601) {
+    // I/Q reference axes (NTSC angles: Q at 33°, +I at 303°).
+    // Drawn for all colorimetries as a familiar visual reference.
+    {
         const qreal ang = qDegreesToRadians(33.0);
-        const QPointF qDir(qCos(ang), -qSin(ang));            // 33° (up-right)
-        const QPointF iDir(qSin(ang), qCos(ang));             // 303° (down-right)
+        const QPointF qDir(qCos(ang), -qSin(ang)); // 33° (up-right)
+        const QPointF iDir(qSin(ang), qCos(ang));  // 303° (down-right)
         p.drawLine(c + qDir * radius, c - qDir * radius);
         p.drawLine(c + iDir * radius, c - iDir * radius);
         p.setPen(QColor(140, 220, 140));

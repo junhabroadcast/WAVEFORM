@@ -81,7 +81,16 @@ WfmGlWidget::~WfmGlWidget()
 
 void WfmGlWidget::setTileState(const TileState& state)
 {
+    const bool modeChanged = state.mode != state_.mode;
     state_ = state;
+    if (modeChanged && glReady_ && accumFbo_) {
+        makeCurrent();
+        glBindFramebuffer(GL_FRAMEBUFFER, accumFbo_);
+        glClearColor(0, 0, 0, 1);
+        glClear(GL_COLOR_BUFFER_BIT);
+        glBindFramebuffer(GL_FRAMEBUFFER, defaultFramebufferObject());
+        doneCurrent();
+    }
     updateReadoutLabel();
     update();
 }
@@ -399,6 +408,7 @@ void WfmGlWidget::drawGraticuleOverlay(QPainter& painter)
         Graticule::drawLightning(painter, r, state_, c);
         break;
     case WfmDisplayMode::Video:
+    case WfmDisplayMode::None:
         break;
     }
 }
@@ -442,6 +452,16 @@ void WfmGlWidget::renderPicture()
 
 void WfmGlWidget::paintGL()
 {
+    if (state_.mode == WfmDisplayMode::None) {
+        glBindFramebuffer(GL_FRAMEBUFFER, defaultFramebufferObject());
+        glViewport(0, 0, int(std::lround(width() * devicePixelRatioF())),
+                   int(std::lround(height() * devicePixelRatioF())));
+        glDisable(GL_BLEND);
+        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT);
+        return;
+    }
+
     if (state_.mode == WfmDisplayMode::Video) {
         renderPicture();
     } else {

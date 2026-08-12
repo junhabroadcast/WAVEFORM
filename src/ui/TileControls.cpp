@@ -19,6 +19,7 @@ TileControls::TileControls(QWidget* parent)
     mode_->addItem(QStringLiteral("Vector"), int(WfmDisplayMode::Vector));
     mode_->addItem(QStringLiteral("Lightning"), int(WfmDisplayMode::Lightning));
     mode_->addItem(QStringLiteral("Video"), int(WfmDisplayMode::Video));
+    mode_->addItem(QStringLiteral("None"), int(WfmDisplayMode::None));
     layout->addRow(QStringLiteral("Mode"), mode_);
 
     style_ = new QComboBox(this);
@@ -73,8 +74,8 @@ TileControls::TileControls(QWidget* parent)
     layout->addRow(QString(), compCr_);
 
     persistence_ = new QSlider(Qt::Horizontal, this);
-    persistence_->setRange(50, 99);
-    persistence_->setValue(92);
+    persistence_->setRange(0, 99);
+    persistence_->setValue(0);
     layout->addRow(QStringLiteral("Persistence"), persistence_);
 
     intensity_ = new QSlider(Qt::Horizontal, this);

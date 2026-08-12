@@ -1,4 +1,4 @@
-# 노트 — WAVEFORM v2.0.0
+# 노트 — WAVEFORM v2.0.1
 
 ## 범위
 
@@ -6,9 +6,9 @@ v2.x는 **화상(픽처) 레이어** 분석에 집중하며, Vector/Lightning의
 
 포함:
 
-- Waveform, Vector, Lightning, Video(Picture)
+- Waveform, Vector, Lightning, Video(Picture), None
 - Color Bars(내장 시뮬레이터)
-- 행렬 기반 타깃 / 연속 트레이스 / SD 전용 I–Q 축
+- 행렬 기반 타깃 / 연속 트레이스 / I–Q 참고 축 (HD 포함)
 
 미포함 (의도적):
 
@@ -34,7 +34,7 @@ SDI → DeckLink 콜백 → FrameQueue → v210/UYVY 언팩 → Y/Cb/Cr
 | `src/video/` | v210 / UYVY 언팩 |
 | `src/color/` | BT.601/709 행렬, Vector/Lightning 타깃 |
 | `src/render/` | OpenGL 위젯 (포인트/선분 트레이스) |
-| `src/display/` | 모드 / 계수선 (I/Q는 SD만) |
+| `src/display/` | 모드 / 계수선 (I/Q 참고축 항상) |
 | `src/ui/` | 메인 창 / 타일 컨트롤 |
 | `third_party/decklink/` | 설치된 `DeckLinkAPI64.dll` `#import` |
 
@@ -46,7 +46,7 @@ SDI → DeckLink 콜백 → FrameQueue → v210/UYVY 언팩 → Y/Cb/Cr
 4. **Start** 후 상태바에 `LOCKED …` 또는 `COLOR BARS (forced) …` / `SIMULATOR …` 가 보이면 정상입니다.
 5. 캡처카드 대신 컬러바만 보려면 상단 **Color Bars** 를 체크하세요.
 6. Vector 타깃 정렬 확인 시 **Gain 1x**, Var Gain 해제. Gain은 트레이스만 확대/축소합니다.
-7. HD(1080 등)에서는 I/Q 축이 보이지 않는 것이 정상입니다. SD(BT.601)에서만 표시됩니다.
+7. I/Q 축은 NTSC 각도 기준 참고선이며, HD에서도 동일하게 표시됩니다 (컴포넌트 신호의 물리적 위상과 1:1은 아님).
 8. 타임코드·문자·램프가 섞인 테스트 패턴은 꼭짓점 외에 중앙 잔여 트레이스가 보일 수 있습니다.
 
 ## 성능
@@ -60,7 +60,7 @@ SDI → DeckLink 콜백 → FrameQueue → v210/UYVY 언팩 → Y/Cb/Cr
 
 - Auto: 높이 ≥720 → BT.709, 그 외 BT.601
 - Vector / Lightning 타깃은 RGB→Y′CbCr 행렬로 계산 (75%/100% 바)
-- I/Q는 NTSC 컴포지트 위상 개념이므로 HD 컴포넌트에서는 표시하지 않음
+- I/Q는 NTSC 각도 기준 참고선으로 HD에서도 표시 (컴포넌트 신호의 물리적 위상과 1:1은 아님)
 - 공인 legalizer / 교정기 대체품이 아닙니다
 
 ## 로컬 매뉴얼 PDF
