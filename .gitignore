@@ -1,0 +1,12 @@
+/build/
+/.vs/
+/out/
+CMakeUserPresets.json
+*.user
+*.autosave
+third_party/decklink/*.tlh
+third_party/decklink/*.tli
+__pycache__/
+*.pyc
+aqtinstall.log
+*.pdf

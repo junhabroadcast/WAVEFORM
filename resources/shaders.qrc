@@ -1,0 +1,9 @@
+<RCC>
+    <qresource prefix="/shaders">
+        <file>shaders/points.vert</file>
+        <file>shaders/points.frag</file>
+        <file>shaders/tonemap.vert</file>
+        <file>shaders/tonemap.frag</file>
+        <file>shaders/decay.frag</file>
+    </qresource>
+</RCC>
